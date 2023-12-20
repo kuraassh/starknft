@@ -229,4 +229,46 @@ mod NFT {
         owners::write(token_id, to);
         TokenTransferred(from, to, token_id);
     }
+    // Burn a token
+    #[external]
+    fn burnToken(token_id: u256) {
+        let owner = owners::read(token_id);
+        assert_approved_or_owner(get_caller_address(), token_id);
+        assert(owner == get_caller_address(), 'caller not owner');
+
+        // Reset approvals
+        token_approvals::write(token_id, Zeroable::zero());
+
+        // Update balances
+        let one = u256 { low: 1, high: 0 };
+        let owner_balance = balances::read(owner);
+        balances::write(owner, owner_balance - one);
+
+        // Update ownership
+        owners::write(token_id, Zeroable::zero());
+        TokenTransferred(owner, Zeroable::zero(), token_id);
+    }
+
+    // Batch transfer tokens
+    #[external]
+    fn batchTransfer(tokens: Array<(Address, u256)>) {
+        let caller = get_caller_address();
+        for (to, token_id) in tokens.iter() {
+            assert(to.is_non_zero(), 'transferring to zero');
+            assert_valid_token(*token_id);
+            assert_approved_or_owner(caller, *token_id);
+
+            transfer(caller, *to, *token_id);
+        }
+    }
+
+    // Update token URI
+    #[external]
+    fn updateTokenURI(token_id: u256, new_uri: Array<felt252>) {
+        assert_admin();
+        assert_valid_token(token_id);
+
+        // Update URI
+        setTokenURI(token_id, new_uri);
+    }
 }
